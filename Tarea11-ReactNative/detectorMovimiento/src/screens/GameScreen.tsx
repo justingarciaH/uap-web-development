@@ -58,7 +58,7 @@ const GameScreen = () => {
     }, 50);
 
     return () => clearInterval(interval);
-  }, [gameOver, position, score, lives]);
+  }, [gameOver, score, lives]);
 
   // Detectar fin de juego
   useEffect(() => {
