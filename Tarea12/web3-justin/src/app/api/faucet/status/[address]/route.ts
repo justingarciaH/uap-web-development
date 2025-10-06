@@ -1,38 +1,25 @@
-// /src/app/api/faucet/status/[address]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { Address } from 'viem';
 import { getFaucetStatus } from '@/lib/faucetService';
-import { verifyToken } from '@/lib/jwt';
+import { authenticateRequest } from '@/lib/auth-middleware';
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: Promise<{ address: string }> } // Ahora params es una Promise
+    { params }: { params: Promise<{ address: string }> }
 ) {
     try {
-        // PROTEGER con JWT según la consigna
-        const authHeader = request.headers.get('authorization');
-        const token = authHeader?.split(' ')[1];
+        // Validar JWT válido (independiente del address consultado)
+        const authResult = await authenticateRequest(request);
 
-        if (!token) {
+        if (!authResult.success) {
             return NextResponse.json(
-                { success: false, message: 'Falta el token de autenticación (JWT).' },
-                { status: 401 }
+                { success: false, message: authResult.error },
+                { status: authResult.status }
             );
         }
 
-        // Verificar el token
-        const payload = verifyToken(token);
-
-        if (!payload) {
-            return NextResponse.json(
-                { success: false, message: 'Token inválido o expirado.' },
-                { status: 403 }
-            );
-        }
-
-        // AWAIT params antes de usarlo
+        // Obtener address del parámetro URL según especificación
         const resolvedParams = await params;
-        const address = resolvedParams.address as Address;
+        const address = resolvedParams.address as `0x${string}`;
 
         if (!address) {
             return NextResponse.json(
@@ -41,6 +28,7 @@ export async function GET(
             );
         }
 
+        // Verificar si la dirección ya reclamó tokens, consultar balance y datos del contrato
         const status = await getFaucetStatus(address);
 
         return NextResponse.json({

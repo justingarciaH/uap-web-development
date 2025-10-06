@@ -1,32 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Address } from 'viem';
 import { claimTokens } from '@/lib/faucetService';
-import { verifyToken } from '@/lib/jwt';
+import { authenticateRequest } from '@/lib/auth-middleware';
 
 export async function POST(request: NextRequest) {
     try {
-        // Obtener el token JWT del header
-        const authHeader = request.headers.get('authorization');
-        const token = authHeader?.split(' ')[1];
+        // Usar el middleware de autenticación
+        const authResult = await authenticateRequest(request);
 
-        if (!token) {
+        if (!authResult.success) {
             return NextResponse.json(
-                { success: false, message: 'Falta el token de autenticación (JWT).' },
-                { status: 401 }
+                { success: false, message: authResult.error },
+                { status: authResult.status }
             );
         }
 
-        // Verificar el token
-        const payload = verifyToken(token);
-
-        if (!payload) {
-            return NextResponse.json(
-                { success: false, message: 'Token inválido o expirado.' },
-                { status: 403 }
-            );
-        }
-
-        const userAddress = payload.address as Address;
+        const userAddress = authResult.userAddress;
 
         // Ejecutar la transacción usando el wallet del backend
         const txHash = await claimTokens(userAddress);

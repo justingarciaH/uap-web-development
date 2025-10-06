@@ -25,25 +25,26 @@ export function useFaucetData(): FaucetHookReturn {
     const { address, isConnected } = useAccount();
     // Usamos useAuth para obtener el token JWT y el estado de sesión
     const { isAuthenticated, token, signOut } = useAuth();
-    
+
     const [data, setData] = useState<FaucetData | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // Lógica de Fetch de Datos Protegida (con useCallback para optimización)
     const fetchFaucetStatus = React.useCallback(async () => {
-        // No hay autenticación o dirección, no se hace el fetch
+        // No hay autenticación, token o address, no se hace el fetch
         if (!isAuthenticated || !token || !address) {
             setData(null);
             // Si no está conectado, aseguramos que el error sea claro
             if (!isConnected) setError("Wallet desconectada.");
             return;
         }
-        
+
         setIsLoading(true);
         setError(null);
 
         try {
+            // El address se pasa como parámetro URL según especificación
             const response = await fetch(`${API_BASE_URL}/${address}`, {
                 method: 'GET',
                 headers: {
@@ -78,7 +79,7 @@ export function useFaucetData(): FaucetHookReturn {
 
     // Efecto para iniciar el polling solo si está autenticado
     useEffect(() => {
-        if (isAuthenticated && token && address) {
+        if (isAuthenticated && token) {
             fetchFaucetStatus();
 
             // Configurar polling para actualización en tiempo real (cada 10 segundos para reducir carga)
@@ -86,7 +87,7 @@ export function useFaucetData(): FaucetHookReturn {
 
             return () => clearInterval(intervalId);
         }
-    }, [fetchFaucetStatus, isAuthenticated, token, address]);
+    }, [fetchFaucetStatus, isAuthenticated, token]);
 
     // Determinar la razón de deshabilitación (Disabled Reason) para el ClaimButton
     const disabledReason = useMemo(() => {
