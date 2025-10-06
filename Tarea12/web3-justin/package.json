@@ -8,21 +8,28 @@
     "start": "next start"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.90.2",
+    "@web3modal/react": "^2.7.1",
     "@web3modal/wagmi": "^5.1.11",
     "ethers": "^6.15.0",
+    "jsonwebtoken": "^9.0.2",
     "next": "15.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-hot-toast": "^2.6.0",
-    "viem": "^2.37.9",
+    "siwe": "^3.0.0",
+    "viem": "^2.37.12",
     "wagmi": "^2.17.5",
     "web3modal": "^1.9.12"
   },
   "devDependencies": {
+    "@react-native-async-storage/async-storage": "^1.24.0",
     "@tailwindcss/postcss": "^4",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "pino-pretty": "^13.1.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

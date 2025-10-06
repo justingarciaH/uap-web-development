@@ -1,52 +1,51 @@
-/*
-Este componente verifica 
-si el usuario ya reclamó tokens.
-*/
-
 'use client'
-import React from 'react'
-import { useAccount, useReadContract } from 'wagmi'
-import { faucetAbi } from '../abi/faucet' // Importa el ABI
-const FAUCET_ADDRESS = process.env.NEXT_PUBLIC_FAUCET_ADDRESS as `0x${string}`
+import React from 'react';
 
-export default function FaucetStatus({ setDisabledReason }: { setDisabledReason: (reason: string | undefined) => void }) {
-    const { address, isConnected } = useAccount()
+// Se eliminan las props antiguas y se usan solo las de estado
+interface FaucetStatusProps {
+    isLoading: boolean;
+    error: string | null;
+    isAuthenticated: boolean;
+    isConnected: boolean;
+    hasClaimed: boolean;
+}
 
-    // Consulta si la dirección ya reclamó
-    const { data: hasClaimed, isLoading } = useReadContract({
-        address: FAUCET_ADDRESS,
-        abi: faucetAbi,
-        functionName: 'hasAddressClaimed',
-        args: [address ?? '0x'],
-       query: { // <<< AÑADIR OBJETO QUERY
-            enabled: isConnected, // <<< MOVER AQUÍ
-            staleTime: 5000, // Opcional: para que no refetchee tan agresivamente
-        }, 
-    })
+// Ya no acepta setDisabledReason, ya que useFaucetData lo maneja
+export default function FaucetStatus({ 
+    isLoading, 
+    error, 
+    isAuthenticated,
+    isConnected,
+    hasClaimed
+}: FaucetStatusProps) {
+    let statusMessage: string;
+    let bgColor: string;
 
-    React.useEffect(() => {
-        if (!isConnected) {
-            setDisabledReason("Conecta tu wallet para verificar el estado.");
-        } else if (isLoading) {
-            setDisabledReason("Verificando estado del Faucet...");
-        } else if (hasClaimed) {
-            setDisabledReason("Ya reclamaste tokens. Solo se permite un reclamo.");
-        } else {
-            setDisabledReason(undefined); // Habilita el botón
-        }
-    }, [isConnected, isLoading, hasClaimed, setDisabledReason])
+    // Lógica para determinar el mensaje y color basado en las props
+    if (!isConnected) {
+        statusMessage = "Desconectado. Conecta tu wallet.";
+        bgColor = "bg-gray-500";
+    } else if (!isAuthenticated) {
+        statusMessage = "Conectado. Por favor, inicia sesión (SIWE) para continuar.";
+        bgColor = "bg-yellow-600";
+    } else if (isLoading) {
+        statusMessage = "Autenticado. Cargando estado del Faucet...";
+        bgColor = "bg-blue-600";
+    } else if (error) {
+        statusMessage = `Error de estado: ${error}`;
+        bgColor = "bg-red-700";
+    } else if (hasClaimed) {
+        statusMessage = "¡Tokens Reclamados! No puedes reclamar de nuevo.";
+        bgColor = "bg-red-500";
+    } else {
+        statusMessage = "¡Listo para Reclamar!";
+        bgColor = "bg-green-600";
+    }
 
-    if (!isConnected) return <p>Estado: Desconectado</p>
-    if (isLoading) return <p>Estado: Cargando...</p>
-    
     return (
-        <div>
-            <p>Estado del Faucet: 
-                {hasClaimed 
-                    ? <span style={{ color: 'red' }}> Reclamado (No puedes reclamar de nuevo)</span> 
-                    : <span style={{ color: 'green' }}> Disponible para reclamar</span>
-                }
-            </p>
+        // Se mejora el estilo para que sea un bloque de estado claro
+        <div className={`p-4 rounded-xl text-white font-extrabold text-center shadow-lg transition-colors duration-300 ${bgColor}`}>
+            {statusMessage}
         </div>
-    )
+    );
 }

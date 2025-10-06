@@ -1,35 +1,34 @@
-// src/app/components/userlist.tsx
 'use client'
 import React from 'react'
-import { useReadContract } from 'wagmi'
-import { faucetAbi } from '../abi/faucet' // Importa el ABI
-const FAUCET_ADDRESS = process.env.NEXT_PUBLIC_FAUCET_ADDRESS as `0x${string}`
 
-export default function UsersList() {
-    // Usar useReadContract
-    const { data: users, isLoading } = useReadContract({
-        address: FAUCET_ADDRESS,
-        abi: faucetAbi,
-        functionName: 'getFaucetUsers',
-        query: { // <<< AÑADIR OBJETO QUERY
-            // CORRECCIÓN: 'watch: true' se reemplaza por 'refetchInterval' para polling
-            refetchInterval: 4000, // Refrescar la lista cada 4 segundos
-        }    })
+interface UsersListProps {
+    users: string[];
+}
 
-    if (isLoading) return <div>Cargando usuarios...</div>
-    if (!users || (Array.isArray(users) && users.length === 0)) return <div>No hay usuarios aún</div>
-    
+export default function UsersList({ users }: UsersListProps) {
+    if (!users || users.length === 0) {
+        return <div className="mt-4 p-3 text-center text-gray-500 bg-white rounded-lg">No hay usuarios que hayan reclamado aún.</div>
+    }
+
+    // Mostrar solo los primeros 10 usuarios para mantener el componente ligero
+    const displayUsers = users.slice(0, 10);
+
     return (
-    <ul>
-    {/* Asegúrate que users es un array de strings */}
-    {(users as string[]).map((u: string) => (
-    <li key={u}>
-    <a href={`https://sepolia.etherscan.io/address/${u}`}
-    target="_blank" rel="noreferrer" style={{ fontSize: '0.8em' }}>
-    {u}
-    </a>
-    </li>
-    ))}
-    </ul>
+        <div className="mt-4 p-4 bg-white rounded-xl shadow-inner">
+            <h3 className="text-md font-bold text-gray-700 mb-3 border-b pb-2">
+                Usuarios que Interactuaron ({users.length} total)
+            </h3>
+            <ul className="space-y-2 text-sm">
+                {displayUsers.map((user, index) => (
+                    <li key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded-lg font-mono text-xs break-all">
+                        <span>{index + 1}.</span>
+                        <span className="text-blue-600 font-medium ml-2">{user}</span>
+                    </li>
+                ))}
+                {users.length > 10 && (
+                     <li className="text-center text-xs text-gray-500 pt-2">... y {users.length - 10} más</li>
+                )}
+            </ul>
+        </div>
     )
 }

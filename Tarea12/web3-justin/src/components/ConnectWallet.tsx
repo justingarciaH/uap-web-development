@@ -1,42 +1,72 @@
+
+// src/components/ConnectWallet.tsx
 'use client'
-import React from 'react'
-import { useAccount, useDisconnect } from 'wagmi' // Mantener para mostrar el estado
-import { useWeb3Modal } from '@web3modal/wagmi/react' // Para usar el hook de Web3Modal
+import React, { useMemo } from 'react'
+import { useAccount } from 'wagmi'
+import { useWeb3Modal } from '@web3modal/wagmi/react'
+import { useAuth } from '@/context/AuthContext'
 
-// Este componente ahora muestra el estado de conexión usando el hook de Wagmi
-// y usa el botón de Web3Modal para la conexión/desconexión (si se usa el componente <w3m-button />)
 export default function ConnectWallet() {
-  const { address, isConnected, chainId } = useAccount()
-  const { open } = useWeb3Modal()
-  const { disconnect } = useDisconnect()
+  const { address, isConnected } = useAccount()
+  const { open } = useWeb3Modal() // Hook correcto para abrir el modal
+  const { isAuthenticated, isSigning, signIn, signOut } = useAuth()
 
-  // Si estás usando el botón nativo de Web3Modal (<w3m-button />) puedes usar la lógica simple:
-  // (Aunque es común querer mostrar la dirección manualmente)
-  if (isConnected && address) {
+  // Memoizar la dirección truncada para evitar re-calculaciones
+  const truncatedAddress = useMemo(() => {
+    if (!address) return '';
+    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+  }, [address]);
+
+  // 1. Mostrar solo el botón de conexión si no está conectado
+  if (!isConnected) {
     return (
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-gray-100 rounded-lg shadow-inner">
-        <div className="text-sm font-medium text-gray-700 mb-2 sm:mb-0">
-          Conectado: <span className="font-mono text-blue-600 break-all">{address.slice(0, 6)}...{address.slice(-4)}</span>
-          <br />
-          Red: <span className="text-sm font-semibold text-gray-600">{chainId === 11155111 ? 'Sepolia' : `Chain ID: ${chainId}`}</span>
-        </div>
-        <button 
-          onClick={() => disconnect()}
-          className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-150 ease-in-out shadow-md text-sm"
+      <button
+        onClick={() => open()}
+        className="w-full py-3 px-6 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition duration-200 shadow-md"
+      >
+        Conectar Wallet
+      </button>
+    )
+  }
+
+  // 2. Si está conectado pero NO AUTENTICADO (no tiene JWT), forzar SIWE
+  if (isConnected && !isAuthenticated) {
+    return (
+      <div className="flex flex-col sm:flex-row gap-3 items-center p-3 bg-yellow-100 border border-yellow-300 rounded-xl shadow-inner">
+        <p className="text-sm font-semibold text-gray-800">
+          Wallet conectada: {truncatedAddress}
+        </p>
+        <button
+          onClick={signIn}
+          disabled={isSigning}
+          className="py-2 px-4 bg-yellow-600 text-white font-bold rounded-lg hover:bg-yellow-700 transition duration-200 disabled:bg-gray-500"
         >
-          Desconectar
+          {isSigning ? 'Firmando...' : 'Iniciar Sesión (SIWE)'}
         </button>
       </div>
     )
   }
 
-  // Si no está conectado, mostramos el botón de Web3Modal para iniciar la conexión
+  // 3. Si está conectado Y AUTENTICADO
   return (
-    <button 
-      onClick={() => open()}
-      className="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-150 ease-in-out shadow-lg"
-    >
-      Conectar Wallet
-    </button>
+    <div className="flex flex-col sm:flex-row items-center gap-4 p-3 bg-gray-50 rounded-xl shadow-md">
+      <p className="text-sm font-medium text-gray-700">
+        Autenticado: {truncatedAddress}
+      </p>
+      <div className="flex gap-2">
+        <button 
+          onClick={() => open({ view: 'Networks' })}
+          className="py-2 px-4 bg-blue-500 text-white text-sm font-semibold rounded-lg hover:bg-blue-600 transition duration-200"
+        >
+          Cambiar Red
+        </button>
+        <button 
+          onClick={signOut}
+          className="py-2 px-4 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 transition duration-200"
+        >
+          Desconectar
+        </button>
+      </div>
+    </div>
   )
 }

@@ -1,27 +1,41 @@
-//componente cliente que envuelve el wagmi con la aplicacion
-"use client";
+'use client'
+import React from 'react'
+import { WagmiProvider } from 'wagmi'
+import { config } from '@/config/wagmi'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { createWeb3Modal } from '@web3modal/wagmi/react'
+import { AuthProvider } from '@/context/AuthContext'
+import { toNumber } from 'ethers'
 
-import { WagmiProvider } from "wagmi";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createWeb3Modal } from "@web3modal/wagmi/react";
-import { config, projectId } from "../config/wagmi";
+const queryClient = new QueryClient()
 
-// Setup queryClient
-const queryClient = new QueryClient();
+// Obtener el projectId
+const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
 
-// Create modal
+if (!projectId) {
+  throw new Error('NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID no está definido')
+}
+
+// Crear el modal FUERA del componente para evitar re-inicializaciones
 createWeb3Modal({
   wagmiConfig: config,
-  projectId: projectId as string  ,
-  enableAnalytics: true, // Optional - defaults to your Cloud configuration
-});
+  projectId,
+  enableAnalytics: false,
+  enableOnramp: false,
+  themeMode: 'light',
+  themeVariables: {
+    '--w3m-z-index': toNumber('9999')
+  }
+})
 
-export function Web3Provider({ children }: { children: React.ReactNode }) {
+export default function Web3Provider({ children }: { children: React.ReactNode }) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </QueryClientProvider>
     </WagmiProvider>
-  );
+  )
 }
