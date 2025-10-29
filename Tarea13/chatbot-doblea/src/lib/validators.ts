@@ -1,3 +1,6 @@
+import type { ModelMessage } from 'ai';
+
+
 //validacion de inputs
 
 export interface ValidationResult {
