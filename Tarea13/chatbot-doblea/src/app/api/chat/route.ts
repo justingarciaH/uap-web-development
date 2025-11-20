@@ -14,6 +14,10 @@ if (!process.env.OPENROUTER_BASE_URL) {
   throw new Error('Falta la URL base de OpenRouter en las variables de entorno.');
 }
 
+if (!process.env.OPENROUTER_MODEL) {
+  throw new Error('Falta la variable OPENROUTER_MODEL en las variables de entorno.');
+}
+
 // Crear cliente OpenRouter
 const openrouter = createOpenAI({
   baseURL: process.env.OPENROUTER_BASE_URL,
@@ -52,10 +56,10 @@ export async function POST(req: Request) {
     // Sanitizar los mensajes
     const sanitizedMessages = cleanMessages(messages);
 
-    const model = process.env.OPENROUTER_MODEL || 'anthropic/claude-3-haiku';
+    const model = process.env.OPENROUTER_MODEL;
 
     // Sistema de instrucciones para el gestor de tareas
-    const systemPrompt = `Eres un asistente inteligente de gestión de tareas llamado "AI Todo Manager". 
+    const systemPrompt = `Eres un asistente inteligente de gestión de tareas llamado "AI Todo Manager".
 
 Tu trabajo es ayudar al usuario a organizar y gestionar sus tareas de manera conversacional y eficiente.
 
@@ -99,19 +103,25 @@ CATEGORÍAS:
       ...sanitizedMessages
     ];
 
+    console.log('About to call streamText with model:', model);
+    console.log('Model from env:', process.env.OPENROUTER_MODEL);
+
     // Usar streamText con tool calling de Vercel AI SDK
     const result = await streamText({
-      model: openrouter(model),
+      model: openrouter(model!),
       messages: messagesWithSystem,
       tools: allTools,
       temperature: 0.7,
     });
 
-    return result.toTextStreamResponse();
+    console.log('StreamText result obtained, about to return response');
 
+    const response = result.toTextStreamResponse();
+    console.log('Response created, sending to client');
+
+    return response;
   } catch (error: any) {
     console.error('❌ Error en la API del chat:', error);
-
     // Manejo específico de errores
     if (error.message?.includes('API key')) {
       return new Response(
@@ -122,7 +132,6 @@ CATEGORÍAS:
         }
       );
     }
-
     if (error.message?.includes('rate limit')) {
       return new Response(
         JSON.stringify({ error: 'Límite de solicitudes excedido. Por favor, intenta más tarde.' }),
@@ -132,7 +141,6 @@ CATEGORÍAS:
         }
       );
     }
-
     // Error genérico
     return new Response(
       JSON.stringify({
