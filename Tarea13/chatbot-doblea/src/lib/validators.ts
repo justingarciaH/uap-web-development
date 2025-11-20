@@ -1,5 +1,4 @@
-import type { ModelMessage } from 'ai';
-
+// src/lib/validators.ts
 
 //validacion de inputs
 

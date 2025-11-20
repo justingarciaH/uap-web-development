@@ -1,3 +1,5 @@
+// src/components/TypingIndicator.tsx
+
 export default function TypingIndicator() {
   return (
     <div className="flex justify-start animate-fade-in">

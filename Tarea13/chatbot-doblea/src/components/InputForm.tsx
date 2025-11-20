@@ -1,3 +1,5 @@
+// src/components/InputForm.tsx
+
 interface InputFormProps {
   input: string;
   isLoading: boolean;
@@ -31,21 +33,21 @@ export default function InputForm({
                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
                    disabled:opacity-50 disabled:cursor-not-allowed transition-all
                    placeholder-gray-400"
-          value={input}
+          value={input || ''}
           placeholder="Pregunte lo que quiera mi rey..."
           onChange={onInputChange}
           disabled={isLoading}
           maxLength={maxLength}
         />
-
+ 
         <button
           type="submit"
           className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-600
                    text-white px-6 py-3 rounded-full font-semibold
-                   disabled:opacity-50 disabled:cursor-not-allowed
+                   disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none
                    transition-all duration-200 shadow-lg hover:shadow-xl
                    transform hover:scale-105 active:scale-95"
-          disabled={isLoading || !input.trim()}
+          disabled={isLoading || !input || !input.trim()}
         >
           {isLoading ? (
             <span className="flex items-center gap-2">
@@ -66,7 +68,7 @@ export default function InputForm({
         </button>
       </form>
 
-      <CharacterCounter currentLength={input.length} maxLength={maxLength} />
+      <CharacterCounter currentLength={input?.length || 0} maxLength={maxLength} />
     </div>
   );
 }

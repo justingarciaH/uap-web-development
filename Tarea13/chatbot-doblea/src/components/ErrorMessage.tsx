@@ -1,3 +1,4 @@
+// src/components/ErrorMessage.tsx
 interface ErrorMessageProps {
   type: 'validation' | 'api';
   message: string;

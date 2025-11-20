@@ -1,26 +1,35 @@
 'use client';
 
+import { useChat } from '@ai-sdk/react';
 import { useEffect, useRef, useState } from 'react';
-import { validateSingleMessage } from '@/lib/validators';
-import { cleanLLMTokens } from '@/lib/sanitizer';
-import { ChatMessage } from '@/lib/types';
 import Header from '@/components/Header';
 import WelcomeMessage from '@/components/WelcomeMessage';
 import MessageBubble from '@/components/MessageBubble';
 import TypingIndicator from '@/components/TypingIndicator';
 import ErrorMessage from '@/components/ErrorMessage';
 import InputForm from '@/components/InputForm';
+import TaskList from '@/components/TaskList';
+import StatsPanel from '@/components/StatsPanel';
+import { TaskResponse } from '@/models/Task';
+
 
 export default function Chat() {
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [validationError, setValidationError] = useState<string | null>(null);
+ const { messages, sendMessage, status, error } = useChat({
+    onError: (error) => {
+      console.error('Error en el chat:', error);
+    },
+  });
 
-  // Referencias
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [tasks, setTasks] = useState<TaskResponse[]>([]);
+  const [showTasks, setShowTasks] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const isLoading = status === 'streaming';
+
 
   // Auto-scroll de los mensajes
   useEffect(() => {
@@ -29,137 +38,119 @@ export default function Chat() {
     }
   }, [messages]);
 
-  // Función para enviar mensajes y manejar el streaming de la respuesta
-  const postMessagesAndStream = async (newMessages: ChatMessage[]) => {
-    setIsLoading(true);
-    setError(null);
 
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages.map(m => ({ role: m.role, content: m.content })) }),
-      });
+  //cargar tareas al inicio 
+  useEffect(() => {
+    loadTasks();
+  }, []);
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `API respondio with ${res.status}`);
-      }
-
-      // Create a placeholder assistant message and stream into it
-      const assistantId = String(Date.now()) + '-assistant';
-      setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '' }]);
-
-      
-      // Leer el stream SSE (Server-Sent Events)
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error('No se pudo leer stream de respuesta.');
-
-      const dec = new TextDecoder();
-      let accumulated = '';
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        const chunk = dec.decode(value, { stream: true });
-        const lines = chunk.split('\n'); 
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6); // Remover "data: "
-            
-            if (data === '[DONE]') continue;
-
-            try {
-              const parsed = JSON.parse(data);
-              const content = parsed.choices?.[0]?.delta?.content;
-              
-              if (content) {
-                accumulated += content;
-
-                       
-              //  LIMPIAR TOKENS ANTES DE ACTUALIZAR
-              const cleanedContent = cleanLLMTokens(accumulated);
-                
-                // Actualizar el mensaje del asistente progresivamente
-                setMessages(prev => 
-                  prev.map(m => 
-                    m.id === assistantId 
-                      ? { ...m, content: cleanedContent } 
-                      : m
-                  )
-                );
-              }
-            } catch {
-              // Ignorar errores de parsing de líneas incompletas
-            }
-          }
-        }
-      }
-
-    } catch (err: any) {
-      console.error('Error en postMessagesAndStream:', err);
-      setError(err instanceof Error ? err : new Error(String(err)));
-    } finally {
-      setIsLoading(false);
+  //recargar tareas cuando hay nuevos mensajes (el LLM pudo haber modificado alguna tarea)
+  useEffect(() => {
+    if (messages.length > 0 && messages[messages.length -1].role === 'assistant') {
+      loadTasks();
     }
-  };
+  }, [messages])
 
-  // Form submit
-  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+
+  const loadTasks = async () => {
+    try {
+      const response = await fetch('/api/tasks?completed=false&sortBy=dueDate&sortOrder=asc');
+      const data = await response.json();
+      if (data.success) {
+        setTasks(data.tasks);
+      }
+    } catch (error) {
+      console.error('Error al cargar tareas:', error);
+    }
+  }
+
+   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    const validation = validateSingleMessage(input);
-    if (!validation.isvalid) {
-      setValidationError(validation.errorMessage || 'Mensaje inválido');
+    if (!input.trim()) {
+      setValidationError('El mensaje no puede estar vacío');
       return;
     }
+
+    if (input.length > 10000) {
+      setValidationError('El mensaje es demasiado largo (máximo 10,000 caracteres)');
+      return;
+    }
+
     setValidationError(null);
-
-    // Create user message and append locally
-    const userMsg: ChatMessage = { id: String(Date.now()) + '-user', role: 'user', content: input.trim() };
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
+    (sendMessage as any)({ content: input });
     setInput('');
-
-    // Send to server and stream assistant response
-    await postMessagesAndStream(newMessages);
   };
 
-  // Input change
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (validationError) setValidationError(null);
     setInput(e.target.value);
   };
 
-
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       
-      <Header title="🤖 Chatbot Justinobot" subtitle="Potenciado por los mismos dioses" />
+      <Header title="🤖 AI Todo Manager" subtitle="Gestor inteligente de tareas con IA" />
       
-      {/* Contenedor de mensajes */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        <div className="max-w-4xl mx-auto">
-
-      {/* Mensaje de bienvenida */}
-        {messages.length === 0 && <WelcomeMessage />}
-          
-        {/* Mensajes */}
-        {messages.map((m) => (
-          <MessageBubble key={m.id} message={m} />
-        ))}
-
-        {/* indicador de escritura */}
-        {isLoading && <TypingIndicator />}
-
-        {/* el coso para scrollear automaticamente */}
-        <div ref={messagesEndRef} />
+      {/* Barra de acciones rápidas */}
+      <div className="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 px-4 py-2">
+        <div className="max-w-4xl mx-auto flex gap-2 flex-wrap">
+          <button
+            onClick={() => setShowTasks(!showTasks)}
+            className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg text-sm font-medium transition-colors border border-blue-500/30"
+          >
+            📝 {showTasks ? 'Ocultar' : 'Ver'} Tareas ({tasks.length})
+          </button>
+          <button
+            onClick={() => setShowStats(!showStats)}
+            className="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 rounded-lg text-sm font-medium transition-colors border border-purple-500/30"
+          >
+            📊 {showStats ? 'Ocultar' : 'Ver'} Estadísticas
+          </button>
+          <button
+            onClick={loadTasks}
+            className="px-3 py-1.5 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-lg text-sm font-medium transition-colors border border-green-500/30"
+          >
+            🔄 Actualizar
+          </button>
+        </div>
       </div>
-    </div>
 
-      {/* Formulario de entrada */}
+      {/* Contenedor principal */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-7xl mx-auto p-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            
+            {/* Columna de chat */}
+            <div className={`${showTasks || showStats ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-4`}>
+              
+              {/* Mensaje de bienvenida */}
+              {messages.length === 0 && <WelcomeMessage />}
+              
+              {/* Mensajes del chat */}
+              {messages.map((m) => (
+                <MessageBubble key={m.id} message={m} />
+              ))}
+
+              {/* Indicador de escritura */}
+              {isLoading && <TypingIndicator />}
+
+              {/* Scroll anchor */}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Columna lateral - Tareas y Stats */}
+            {(showTasks || showStats) && (
+              <div className="lg:col-span-1 space-y-4">
+                {showTasks && <TaskList tasks={tasks} onTaskUpdate={loadTasks} />}
+                {showStats && <StatsPanel />}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Formulario de entrada - Fixed en la parte inferior */}
       <div className="border-t border-gray-700 bg-gray-800/50 backdrop-blur-sm p-4">
         {error && (
           <div className="max-w-4xl mx-auto mb-4">
@@ -171,10 +162,32 @@ export default function Chat() {
           input={input}
           isLoading={isLoading}
           validationError={validationError}
-          onInputChange={handleChange}
-          onSubmit={handleFormSubmit}
+          onInputChange={onInputChange}
+          onSubmit={onSubmit}
           maxLength={10000}
         />
+
+        {/* Sugerencias rápidas */}
+        {messages.length === 0 && (
+          <div className="max-w-4xl mx-auto mt-3">
+            <div className="flex gap-2 flex-wrap justify-center">
+              {[
+                '📝 Agregar tarea: comprar leche',
+                '✅ Muéstrame mis tareas pendientes',
+                '📊 ¿Qué tan productivo he sido?',
+                '⚡ Tareas urgentes para hoy'
+              ].map((suggestion, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setInput(suggestion)}
+                  className="px-3 py-1.5 bg-gray-700/50 hover:bg-gray-700 text-gray-300 text-xs rounded-full transition-colors border border-gray-600"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
